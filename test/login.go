@@ -2,15 +2,15 @@ package test
 
 import (
 	"context"
-	"github.com/fabric8-services/fabric8-common/login/tokencontext"
 
-	//"github.com/fabric8-services/fabric8-common/token/tokencontext"
-	"golang.org/x/oauth2"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	account "github.com/fabric8-services/fabric8-auth/authentication/account/repository"
 	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
 	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/goadesign/goa"
@@ -43,16 +43,16 @@ func WithIncompleteIdentity(ctx context.Context, ident account.Identity) context
 }
 
 func fillIncompleteClaimsWithIdentity(ident account.Identity) *jwt.Token {
-	token := jwt.New(jwt.SigningMethodRS256)
-	token.Claims.(jwt.MapClaims)["imageURL"] = ident.User.ImageURL
-	token.Claims.(jwt.MapClaims)["iat"] = time.Now().Unix()
-	return token
+	tk := jwt.New(jwt.SigningMethodRS256)
+	tk.Claims.(jwt.MapClaims)["imageURL"] = ident.User.ImageURL
+	tk.Claims.(jwt.MapClaims)["iat"] = time.Now().Unix()
+	return tk
 }
 
 func service(serviceName string, key interface{}, u account.Identity) *goa.Service {
 	svc := goa.New(serviceName)
 	svc.Context = WithIdentity(svc.Context, u)
-	svc.Context = manager.ContextWithTokenManager(svc.Context, testtoken.TokenManager)
+	svc.Context = tokensupport.ContextWithTokenManager(svc.Context, testtoken.TokenManager)
 	return svc
 }
 
@@ -71,7 +71,7 @@ func ServiceAsUserWithIncompleteClaims(serviceName string, u account.Identity) *
 // UnsecuredService creates a new service with token manager injected by without any identity in context
 func UnsecuredService(serviceName string) *goa.Service {
 	svc := goa.New(serviceName)
-	svc.Context = tokencontext.ContextWithTokenManager(svc.Context, testtoken.TokenManager)
+	svc.Context = tokensupport.ContextWithTokenManager(svc.Context, testtoken.TokenManager)
 	return svc
 }
 
@@ -79,7 +79,7 @@ func UnsecuredService(serviceName string) *goa.Service {
 func ServiceAsServiceAccountUser(serviceName string, u account.Identity) *goa.Service {
 	svc := goa.New(serviceName)
 	svc.Context = WithServiceAccountAuthz(svc.Context, testtoken.TokenManager, u)
-	svc.Context = tokencontext.ContextWithTokenManager(svc.Context, testtoken.TokenManager)
+	svc.Context = tokensupport.ContextWithTokenManager(svc.Context, testtoken.TokenManager)
 	return svc
 }
 

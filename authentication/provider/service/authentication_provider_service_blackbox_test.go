@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/fabric8-services/fabric8-auth/rest"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/fabric8-services/fabric8-common/test"
+
+	"github.com/fabric8-services/fabric8-auth/rest"
 
 	"github.com/fabric8-services/fabric8-auth/app"
 	"github.com/fabric8-services/fabric8-auth/application/service/factory"
@@ -27,6 +30,7 @@ import (
 	testsupport "github.com/fabric8-services/fabric8-auth/test"
 	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
 	testoauth "github.com/fabric8-services/fabric8-auth/test/token/oauth"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/goadesign/goa"
@@ -154,7 +158,9 @@ func (s *authenticationProviderServiceTestSuite) unapprovedUserRedirected() (*st
 	}
 
 	token := &oauth2.Token{Expiry: time.Now(), AccessToken: accessToken, RefreshToken: refreshToken}
-	redirectURL, _, err := s.Application.AuthenticationProviderService().CreateOrUpdateIdentityAndUser(testtoken.ContextWithRequest(context.Background()), redirect, token)
+	ctx, err := test.ContextWithRequest(context.Background())
+	require.NoError(s.T(), err)
+	redirectURL, _, err := s.Application.AuthenticationProviderService().CreateOrUpdateIdentityAndUser(ctx, redirect, token)
 	return redirectURL, err
 }
 
@@ -599,7 +605,9 @@ func (s *authenticationProviderServiceTestSuite) TestExchangeRefreshToken() {
 			refreshToken, err := testtoken.GenerateRefreshTokenWithClaims(claims)
 			require.NoError(t, err)
 			// when
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(nil), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			result, err := s.Application.TokenService().ExchangeRefreshToken(ctx, "", refreshToken)
 			// then
 			require.NoError(t, err)
@@ -618,7 +626,9 @@ func (s *authenticationProviderServiceTestSuite) TestExchangeRefreshToken() {
 			// given
 			g := s.NewTestGraph(t)
 			user := g.CreateUser()
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(nil), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			claims := make(map[string]interface{})
 			claims["sub"] = user.IdentityID().String()
 			claims["iat"] = time.Now().Unix() - 60*60 // Issued 1h ago
@@ -647,7 +657,9 @@ func (s *authenticationProviderServiceTestSuite) TestExchangeRefreshToken() {
 			// given
 			g := s.NewTestGraph(t)
 			user := g.CreateUser()
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(nil), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			claims := make(map[string]interface{})
 			claims["sub"] = user.IdentityID().String()
 			claims["iat"] = time.Now().Unix() - 60*60 // Issued 1h ago
@@ -683,9 +695,11 @@ func (s *authenticationProviderServiceTestSuite) TestExchangeRefreshToken() {
 
 		t.Run("invalid format", func(t *testing.T) { // Fails if invalid format of refresh token
 			// given
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(nil), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// when
-			_, err := s.Application.TokenService().ExchangeRefreshToken(ctx, "", "")
+			_, err = s.Application.TokenService().ExchangeRefreshToken(ctx, "", "")
 			// then
 			require.EqualError(t, err, "token contains an invalid number of segments")
 			require.IsType(t, autherrors.NewUnauthorizedError(""), err)
@@ -701,8 +715,10 @@ func (s *authenticationProviderServiceTestSuite) TestExchangeRefreshToken() {
 			claims["exp"] = time.Now().Unix() - 60    // Expired 1m ago
 			refreshToken, err := testtoken.GenerateRefreshTokenWithClaims(claims)
 			require.NoError(t, err)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// when
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(nil), tm)
 			_, err = s.Application.TokenService().ExchangeRefreshToken(ctx, "", refreshToken)
 			// then
 			require.EqualError(t, err, "Token is expired")
@@ -793,7 +809,7 @@ func (s *authenticationProviderServiceTestSuite) checkLoginCallback(dummyOauth *
 	require.NotNil(s.T(), tokenJson)
 	require.True(s.T(), len(tokenJson) > 0)
 
-	_, err = manager.ReadTokenSetFromJson(context.Background(), tokenJson[0])
+	_, err = manager.ReadTokenSetFromJSON(context.Background(), tokenJson[0])
 	require.NoError(s.T(), err)
 
 	//assert.NoError(s.T(), testtoken.EqualAccessTokens(context.Background(), dummyOauth.accessToken, *tokenSet.AccessToken))
@@ -948,9 +964,11 @@ func (s *authenticationProviderServiceTestSuite) TestCreateOrUpdateIdentityAndUs
 			Username: user.Identity().Username,
 		}, nil
 	}
+	ctx, err := test.ContextWithRequest(context.Background())
+	require.NoError(s.T(), err)
 	// when
 	resultURL, userToken, err := s.Application.AuthenticationProviderService().CreateOrUpdateIdentityAndUser(
-		testtoken.ContextWithRequest(context.Background()),
+		ctx,
 		&url.URL{Path: redirectURL},
 		oauth2Token)
 

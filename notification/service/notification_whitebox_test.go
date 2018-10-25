@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
@@ -8,10 +9,11 @@ import (
 	autherrors "github.com/fabric8-services/fabric8-auth/errors"
 	"github.com/fabric8-services/fabric8-auth/notification"
 	"github.com/fabric8-services/fabric8-auth/rest"
-	testsupport "github.com/fabric8-services/fabric8-auth/test"
+	"github.com/fabric8-services/fabric8-auth/test"
 	testsuite "github.com/fabric8-services/fabric8-auth/test/suite"
-	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
-	tokentestsupport "github.com/fabric8-services/fabric8-auth/test/token"
+	testsupport "github.com/fabric8-services/fabric8-common/test"
+	testtoken "github.com/fabric8-services/fabric8-common/test/token"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 
 	"net/http"
 
@@ -29,7 +31,7 @@ func TestNotification(t *testing.T) {
 type TestNotificationSuite struct {
 	testsuite.UnitTestSuite
 	ns                 *notificationServiceImpl
-	doer               *testsupport.DummyHttpDoer
+	doer               *test.DummyHttpDoer
 	notificationConfig *notificationURLConfig
 	msg                notification.Message
 }
@@ -49,12 +51,12 @@ func (s *TestNotificationSuite) SetupSuite() {
 	customAttributes["spaceName"] = "notification testing"
 	customAttributes["acceptURL"] = "localhost/accept"
 
-	targetId := "8bccc228-bba7-43ad-b077-15fbb9148f7f"
+	targetID := "8bccc228-bba7-43ad-b077-15fbb9148f7f"
 
 	msg := notification.Message{
 		UserID:      nil,
 		Custom:      customAttributes,
-		TargetID:    targetId,
+		TargetID:    targetID,
 		MessageType: "invitation.team.noorg",
 	}
 
@@ -63,9 +65,10 @@ func (s *TestNotificationSuite) SetupSuite() {
 
 func (s *TestNotificationSuite) TestCreateClientWithServiceAccountToken() {
 	// create a context
-	ctx := tokentestsupport.ContextWithTokenManager()
-	tokenManager, err := manager.ReadTokenManagerFromContext(ctx)
+	ctx := tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager)
+	tm, err := tokensupport.ReadManagerFromContext(ctx)
 	require.Nil(s.T(), err)
+	tokenManager := tm.(manager.TokenManager)
 
 	// extract the token
 	saToken := tokenManager.AuthServiceAccountToken()
@@ -86,10 +89,12 @@ func (s *TestNotificationSuite) TestCreateClientWithServiceAccountToken() {
 }
 
 func (s *TestNotificationSuite) TestSend() {
-	ctx, _, reqID := testtoken.ContextWithTokenAndRequestID(s.T())
+	ctx, _, _, reqID, err := testsupport.ContextWithTokenAndRequestID()
+	require.NoError(s.T(), err)
 
-	tokenManager, err := manager.ReadTokenManagerFromContext(ctx)
+	tm, err := tokensupport.ReadManagerFromContext(ctx)
 	require.Nil(s.T(), err)
+	tokenManager := tm.(manager.TokenManager)
 
 	// extract the token
 	saToken := tokenManager.AuthServiceAccountToken()
@@ -149,13 +154,14 @@ func (s *TestNotificationSuite) TestSend() {
 
 		//then
 		require.Error(t, err)
-		testsupport.AssertError(t, err, autherrors.InternalError{}, "unexpected response code: 500 Internal Server Error; response body: ")
+		test.AssertError(t, err, autherrors.InternalError{}, "unexpected response code: 500 Internal Server Error; response body: ")
 	})
 }
 
 func (s *TestNotificationSuite) TestSendAsync() {
 	// given
-	ctx, _, _ := testtoken.ContextWithTokenAndRequestID(s.T())
+	ctx, _, _, _, err := testsupport.ContextWithTokenAndRequestID()
+	require.NoError(s.T(), err)
 	config := &notificationURLConfig{
 		ConfigurationData: s.Config,
 		notificationURL:   "::::",
@@ -223,7 +229,7 @@ func (s *TestNotificationSuite) TestSendAsync() {
 		assert.NoError(t, e)
 		assert.True(t, ok)
 		require.Error(t, err)
-		testsupport.AssertError(t, err, autherrors.InternalError{}, "unexpected response code: 500 Internal Server Error; response body: ")
+		test.AssertError(t, err, autherrors.InternalError{}, "unexpected response code: 500 Internal Server Error; response body: ")
 	})
 
 	s.T().Run("should send messages async", func(t *testing.T) {

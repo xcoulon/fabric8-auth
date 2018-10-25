@@ -4,10 +4,11 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"github.com/fabric8-services/fabric8-auth/authorization/token"
 	"os"
 	"sync"
 	"testing"
+
+	"github.com/fabric8-services/fabric8-auth/authorization/token"
 
 	config "github.com/fabric8-services/fabric8-auth/configuration"
 	"github.com/fabric8-services/fabric8-auth/resource"
@@ -147,11 +148,11 @@ func (s *TestWhiteboxTokenSuite) checkServiceAccountToken(rawToken, saID, saName
 			return nil, errors.New("There is no 'kid' header in the token")
 		}
 		if fmt.Sprintf("%s", kid) != s.tokenManager.serviceAccountPrivateKey.KeyID {
-			return nil, errors.New(fmt.Sprintf("The key ID %s doesn't match the private key ID %s", kid, s.tokenManager.serviceAccountPrivateKey.KeyID))
+			return nil, errors.Errorf("The key ID %s doesn't match the private key ID %s", kid, s.tokenManager.serviceAccountPrivateKey.KeyID)
 		}
 		key := s.tokenManager.PublicKey(fmt.Sprintf("%s", kid))
 		if key == nil {
-			return nil, errors.New(fmt.Sprintf("There is no public key with such ID: %s", kid))
+			return nil, errors.Errorf("There is no public key with such ID: %s", kid)
 		}
 		return key, nil
 	})
@@ -255,11 +256,11 @@ func (s *TestWhiteboxTokenSuite) TestAuthServiceAccount() {
 			return nil, errors.New("There is no 'kid' header in the token")
 		}
 		if fmt.Sprintf("%s", kid) != s.tokenManager.serviceAccountPrivateKey.KeyID {
-			return nil, errors.New(fmt.Sprintf("The key ID %s doesn't match the private key ID %s", kid, s.tokenManager.serviceAccountPrivateKey.KeyID))
+			return nil, errors.Errorf("The key ID %s doesn't match the private key ID %s", kid, s.tokenManager.serviceAccountPrivateKey.KeyID)
 		}
 		key := s.tokenManager.PublicKey(fmt.Sprintf("%s", kid))
 		if key == nil {
-			return nil, errors.New(fmt.Sprintf("There is no public key with such ID: %s", kid))
+			return nil, errors.Errorf("There is no public key with such ID: %s", kid)
 		}
 		return key, nil
 	})

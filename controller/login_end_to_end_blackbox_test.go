@@ -4,30 +4,31 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/fabric8-services/fabric8-auth/app"
-	account "github.com/fabric8-services/fabric8-auth/authentication/account/repository"
-	"github.com/fabric8-services/fabric8-auth/authentication/provider"
-	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
-	"github.com/fabric8-services/fabric8-auth/client"
-	"github.com/fabric8-services/fabric8-auth/rest"
-
-	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
-	"github.com/goadesign/goa"
-	"github.com/stretchr/testify/assert"
-	"strings"
-
-	"github.com/fabric8-services/fabric8-auth/gormtestsupport"
-	"github.com/fabric8-services/fabric8-auth/resource"
-	"github.com/goadesign/goa/uuid"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/fabric8-services/fabric8-auth/app"
+	account "github.com/fabric8-services/fabric8-auth/authentication/account/repository"
+	"github.com/fabric8-services/fabric8-auth/authentication/provider"
+	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
+	"github.com/fabric8-services/fabric8-auth/client"
+	"github.com/fabric8-services/fabric8-auth/gormtestsupport"
+	"github.com/fabric8-services/fabric8-auth/resource"
+	"github.com/fabric8-services/fabric8-auth/rest"
+	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
+
+	"github.com/goadesign/goa"
+	"github.com/goadesign/goa/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestServiceLoginBlackboxTest(t *testing.T) {
@@ -173,7 +174,7 @@ func (s *serviceLoginBlackBoxTest) runLoginEndToEnd() {
 
 		// Validate the token returned contains the identity details for which the oauth server had
 		// returned the token.
-		returnedToken, err := manager.ReadTokenSetFromJson(context.Background(), tokenJson[0])
+		returnedToken, err := manager.ReadTokenSetFromJSON(context.Background(), tokenJson[0])
 		require.NoError(s.T(), err)
 
 		updatedIdentity := s.Graph.LoadUser(s.identity.ID).Identity()
@@ -319,7 +320,7 @@ func (s *serviceLoginBlackBoxTest) createNewLoginContext(path string, prms url.V
 	refererUrl := "https://alm-url.example.org/path/oauth2"
 	req.Header.Add("referer", refererUrl)
 
-	ctx := testtoken.ContextWithTokenManager()
+	ctx := tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager)
 	goaCtx := goa.NewContext(goa.WithAction(ctx, "LoginTest"), rw, req, prms)
 	loginCtx, err := app.NewLoginLoginContext(goaCtx, req, goa.New("LoginService"))
 	require.NoError(s.T(), err)
@@ -339,7 +340,7 @@ func (s *serviceLoginBlackBoxTest) createNewTokenContext(path string, prms url.V
 	refererUrl := "https://alm-url.example.org/path/oauth2/callback"
 	req.Header.Add("referer", refererUrl)
 
-	ctx := testtoken.ContextWithTokenManager()
+	ctx := tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager)
 	goaCtx := goa.NewContext(goa.WithAction(ctx, "TokenContext"), rw, req, prms)
 	loginCtx, err := app.NewCallbackAuthorizeContext(goaCtx, req, goa.New("TokenContextService"))
 	require.NoError(s.T(), err)
@@ -359,7 +360,7 @@ func (s *serviceLoginBlackBoxTest) createNewAuthCallbackContext(path string, prm
 	refererUrl := "https://alm-url.example.org/path/oauth2/callback"
 	req.Header.Add("referer", refererUrl)
 
-	ctx := testtoken.ContextWithTokenManager()
+	ctx := tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager)
 	goaCtx := goa.NewContext(goa.WithAction(ctx, "AuthCallbackTest"), rw, req, prms)
 	loginCtx, err := app.NewCallbackAuthorizeContext(goaCtx, req, goa.New("AuthCallbackService"))
 	require.NoError(s.T(), err)
@@ -379,7 +380,7 @@ func (s *serviceLoginBlackBoxTest) createNewAuthCodeURLContext(path string, prms
 	refererUrl := "https://alm-url.example.org/path"
 	req.Header.Add("referer", refererUrl)
 
-	ctx := testtoken.ContextWithTokenManager()
+	ctx := tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager)
 	goaCtx := goa.NewContext(goa.WithAction(ctx, "AuthTest"), rw, req, prms)
 	loginCtx, err := app.NewAuthorizeAuthorizeContext(goaCtx, req, goa.New("AuthService"))
 	require.NoError(s.T(), err)

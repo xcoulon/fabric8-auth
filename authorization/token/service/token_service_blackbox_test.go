@@ -5,13 +5,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fabric8-services/fabric8-common/test"
+
 	"github.com/fabric8-services/fabric8-auth/authorization"
 	"github.com/fabric8-services/fabric8-auth/authorization/token"
-	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
 	"github.com/fabric8-services/fabric8-auth/errors"
 	"github.com/fabric8-services/fabric8-auth/gormtestsupport"
 	testjwt "github.com/fabric8-services/fabric8-auth/test/jwt"
 	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +56,7 @@ func (s *tokenServiceBlackboxTest) TestSimpleAuditAccessToken() {
 	s.Graph.CreateIdentityRole(u, r, echoRole)
 
 	// Audit the user token for the new resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, r.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, r.ResourceID())
 	require.NoError(s.T(), err)
 
 	require.NotNil(s.T(), rptToken)
@@ -72,7 +74,7 @@ func (s *tokenServiceBlackboxTest) TestSimpleAuditAccessToken() {
 	require.Contains(s.T(), perms[0].Scopes, "echo")
 
 	// Audit the RPT token for the same resource ID, it should return nil since the privileges haven't changed and the token should not have expired
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, r.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, r.ResourceID())
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), rptToken)
 }
@@ -103,7 +105,7 @@ func (s *tokenServiceBlackboxTest) TestRPTTokenReplacedWithAdditionalResource() 
 	s.Graph.CreateIdentityRole(u, r, foxtrotRole)
 
 	// Audit the user token for the new resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, r.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, r.ResourceID())
 	require.NoError(s.T(), err)
 
 	require.NotNil(s.T(), rptToken)
@@ -127,7 +129,7 @@ func (s *tokenServiceBlackboxTest) TestRPTTokenReplacedWithAdditionalResource() 
 	s.Graph.CreateIdentityRole(u, r2, golfRole)
 
 	// Audit the RPT token for the second resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, r2.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, r2.ResourceID())
 	require.NoError(s.T(), err)
 
 	require.NotNil(s.T(), rptToken)
@@ -182,7 +184,7 @@ func (s *tokenServiceBlackboxTest) TestOldestPermissionRemovedFromMaxSizeToken()
 	s.Graph.CreateIdentityRole(u, firstResource, hotelRole)
 
 	// Audit the user token for the resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, firstResource.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, firstResource.ResourceID())
 	require.NoError(s.T(), err)
 
 	require.NotNil(s.T(), rptToken)
@@ -195,7 +197,7 @@ func (s *tokenServiceBlackboxTest) TestOldestPermissionRemovedFromMaxSizeToken()
 		s.Graph.CreateIdentityRole(u, res, hotelRole)
 
 		// Audit the rpt token for the resource ID
-		rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
+		rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
 		require.NoError(s.T(), err)
 
 		require.NotNil(s.T(), rptToken)
@@ -249,7 +251,7 @@ func (s *tokenServiceBlackboxTest) TestStaleTokenWithUnchangedPrivileges() {
 	s.Graph.CreateIdentityRole(u, res, mikeRole)
 
 	// Audit the user token for the resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -265,7 +267,7 @@ func (s *tokenServiceBlackboxTest) TestStaleTokenWithUnchangedPrivileges() {
 	s.setTokenStatus(s.T(), *rptToken, token.TOKEN_STATUS_STALE)
 
 	// Audit the RPT token for the same resource ID, it should return nil
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), rptToken)
 }
@@ -287,7 +289,7 @@ func (s *tokenServiceBlackboxTest) TestStaleTokenWithChangedPrivilegesAfterRoleA
 	// Assign the role to the user for the new resource
 	s.Graph.CreateIdentityRole(u, res, role1)
 	// Audit the user token for the resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 	// Parse the signed RPT token
@@ -306,7 +308,7 @@ func (s *tokenServiceBlackboxTest) TestStaleTokenWithChangedPrivilegesAfterRoleA
 	// Assign the role to the user for the resource (privileged cache is automatically marked as staled)
 	s.Graph.CreateIdentityRole(u, res, role2)
 	// Audit the RPT token for the same resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 	// Parse the signed RPT token
@@ -343,7 +345,7 @@ func (s *tokenServiceBlackboxTest) TestStaleTokenWithChangedPrivilegesAfterRoleR
 	// Assign the 2nd role to the user for the resource
 	idr := s.Graph.CreateIdentityRole(u, res, role2)
 	// Audit the user token for the resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 	// Parse the signed RPT token
@@ -359,7 +361,7 @@ func (s *tokenServiceBlackboxTest) TestStaleTokenWithChangedPrivilegesAfterRoleR
 	// now, let's remove the 2nd role from the user
 	idr.Delete()
 	// Audit the RPT token for the same resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 	// Parse the signed RPT token
@@ -398,7 +400,7 @@ func (s *tokenServiceBlackboxTest) TestStaleTokenWithChangedPrivilegesAfterScope
 	s.Graph.CreateIdentityRole(u, res, role)
 
 	// Audit the user token for the resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -421,7 +423,7 @@ func (s *tokenServiceBlackboxTest) TestStaleTokenWithChangedPrivilegesAfterScope
 	s.setPermissionStale(s.T(), u.IdentityID(), res.ResourceID())
 
 	// Audit the RPT token for the same resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -462,7 +464,7 @@ func (s *tokenServiceBlackboxTest) TestDeprovisionedToken() {
 	s.Graph.CreateIdentityRole(u, res, role)
 
 	// Audit the user token for the resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -470,7 +472,7 @@ func (s *tokenServiceBlackboxTest) TestDeprovisionedToken() {
 	s.setTokenStatus(s.T(), *rptToken, token.TOKEN_STATUS_DEPROVISIONED)
 
 	// Audit the RPT token for the same ID
-	_, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
+	_, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
 	require.Error(s.T(), err)
 	require.IsType(s.T(), err, errors.UnauthorizedError{})
 	require.Equal(s.T(), err.(errors.UnauthorizedError).UnauthorizedCode, errors.UNAUTHORIZED_CODE_TOKEN_DEPROVISIONED)
@@ -499,14 +501,14 @@ func (s *tokenServiceBlackboxTest) TestRevokedToken() {
 	s.Graph.CreateIdentityRole(u, res, role)
 
 	// Audit the user token for the resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 	// Mark the token as revoked and save it
 	s.setTokenStatus(s.T(), *rptToken, token.TOKEN_STATUS_REVOKED)
 
 	// Audit the RPT token for the same ID
-	_, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
+	_, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), *rptToken, res.ResourceID())
 	require.Error(s.T(), err)
 	require.IsType(s.T(), err, errors.UnauthorizedError{})
 	require.Equal(s.T(), err.(errors.UnauthorizedError).UnauthorizedCode, errors.UNAUTHORIZED_CODE_TOKEN_REVOKED)
@@ -523,7 +525,7 @@ func (s *tokenServiceBlackboxTest) TestAuditNonExistentResource() {
 	require.NoError(s.T(), err)
 
 	// Audit the user token for a non-existent resource ID
-	_, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, uuid.NewV4().String())
+	_, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), u.Identity(), at.AccessToken, uuid.NewV4().String())
 	require.Error(s.T(), err)
 	require.IsType(s.T(), err, errors.BadParameterError{})
 }
@@ -563,7 +565,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	s.Graph.CreateIdentityRole(user, res, alphaRole)
 
 	// Audit the user token for the resource ID
-	rptToken, err := s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user.Identity(), at.AccessToken, res.ResourceID())
+	rptToken, err := s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user.Identity(), at.AccessToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -584,7 +586,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	require.NoError(s.T(), err)
 
 	// Audit the user token for same resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user.Identity(), *rptToken, res.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user.Identity(), *rptToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -612,7 +614,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	require.NoError(s.T(), err)
 
 	// Audit user2's token for the same resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user2.Identity(), at2.AccessToken, res.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user2.Identity(), at2.AccessToken, res.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -636,7 +638,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	require.NoError(s.T(), err)
 
 	// Audit user2's token for the res2's resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user2.Identity(), *rptToken, res2.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user2.Identity(), *rptToken, res2.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -682,7 +684,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	team.AddMember(user3)
 
 	// Audit user3's token for res2's resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), at3.AccessToken, res2.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), at3.AccessToken, res2.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -700,7 +702,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	require.NoError(s.T(), err)
 
 	// Audit user3's token for res2's resource ID again
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), *rptToken, res2.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), *rptToken, res2.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -723,7 +725,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	res3 := s.Graph.CreateResource(res2, rt2)
 
 	// Audit user3's token for res3's resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), *rptToken, res3.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), *rptToken, res3.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -759,7 +761,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	require.NoError(s.T(), err)
 
 	// Audit user3's token for res3's resource ID
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), *rptToken, res3.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), *rptToken, res3.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 
@@ -793,7 +795,7 @@ func (s *tokenServiceBlackboxTest) TestTokenUpdatedWhenUserAcceptsResourceInvita
 	require.NoError(s.T(), err)
 
 	// Audit user3's token for res3's resource ID again
-	rptToken, err = s.Application.TokenService().Audit(manager.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), *rptToken, res3.ResourceID())
+	rptToken, err = s.Application.TokenService().Audit(tokensupport.ContextWithTokenManager(s.Ctx, tm), user3.Identity(), *rptToken, res3.ResourceID())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), rptToken)
 	// Parse the signed RPT token to obtain the claims
@@ -827,13 +829,14 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 	s.T().Run("using audit token", func(t *testing.T) {
 		// given
 		g := s.NewTestGraph(t)
-		ctx := testtoken.ContextWithRequest(context.Background())
+		ctx, err := test.ContextWithRequest(context.Background())
+		require.NoError(s.T(), err)
 		// Create a user
 		user := g.CreateUser()
 		// Create an access token for the user
 		at, err := tm.GenerateUserTokenForIdentity(ctx, *user.Identity(), false)
 		require.NoError(t, err)
-		ctx = manager.ContextWithTokenManager(ctx, tm)
+		ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 		accessToken, err := tm.Parse(ctx, at.AccessToken)
 		require.NoError(t, err)
 		// when
@@ -851,7 +854,9 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 		t.Run("containing permissions on 1 resource", func(t *testing.T) {
 			// given
 			g := s.NewTestGraph(t)
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(context.Background()), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// create a user
 			user := g.CreateUser()
 			// Create an initial access token for the user
@@ -886,7 +891,9 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 		t.Run("containing permissions on 1 resource and staled after change", func(t *testing.T) {
 			// given
 			g := s.NewTestGraph(t)
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(context.Background()), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// create a user
 			user := g.CreateUser()
 			// Create an initial access token for the user
@@ -919,7 +926,9 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 		t.Run("containing permissions on 2 resources and staled after change", func(t *testing.T) {
 			// given
 			g := s.NewTestGraph(t)
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(context.Background()), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// create a user
 			user := g.CreateUser()
 			// Create an initial access token for the user
@@ -957,7 +966,9 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 		t.Run("deprovisioned user", func(t *testing.T) {
 			// given
 			g := s.NewTestGraph(t)
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(context.Background()), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// create a user
 			user := g.CreateUser()
 			// Create an initial access token for the user
@@ -985,7 +996,9 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 		t.Run("revoked token", func(t *testing.T) {
 			// given
 			g := s.NewTestGraph(t)
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(context.Background()), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// create a user
 			user := g.CreateUser()
 			// Create an initial access token for the user
@@ -1020,7 +1033,9 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 		t.Run("outdated access token (key pair rotated)", func(t *testing.T) {
 			// given
 			g := s.NewTestGraph(t)
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(context.Background()), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// create a user
 			user := g.CreateUser()
 			// Create an initial access token for the user
@@ -1047,12 +1062,14 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 		t.Run("invalid access token", func(t *testing.T) {
 			// given
 			g := s.NewTestGraph(t)
-			ctx := manager.ContextWithTokenManager(testtoken.ContextWithRequest(context.Background()), tm)
+			ctx, err := test.ContextWithRequest(context.Background())
+			require.NoError(s.T(), err)
+			ctx = tokensupport.ContextWithTokenManager(ctx, tm)
 			// create a user
 			user := g.CreateUser()
 			// when
 			// refresh the user token
-			_, err := s.Application.TokenService().Refresh(ctx, user.Identity(), "foobar")
+			_, err = s.Application.TokenService().Refresh(ctx, user.Identity(), "foobar")
 			// then the result token should not contain a `permissions` claim
 			require.Error(t, err)
 			assert.IsType(t, errors.UnauthorizedError{}, err)
@@ -1065,7 +1082,7 @@ func (s *tokenServiceBlackboxTest) TestRefresh() {
 func (s *tokenServiceBlackboxTest) setTokenStatus(t *testing.T, rptToken string, status int, resourceIDs ...string) string {
 	// Parse the signed RPT token to get the token ID
 	tm := testtoken.TokenManager
-	ctx := manager.ContextWithTokenManager(context.Background(), tm)
+	ctx := tokensupport.ContextWithTokenManager(context.Background(), tm)
 	tokenClaims, err := tm.ParseToken(ctx, rptToken)
 	require.NoError(t, err)
 	// Extract the token ID from the token

@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	testsupport "github.com/fabric8-services/fabric8-common/test"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
+
 	account "github.com/fabric8-services/fabric8-auth/authentication/account/repository"
 	manager "github.com/fabric8-services/fabric8-auth/authorization/token/manager"
 	"github.com/fabric8-services/fabric8-auth/configuration"
@@ -51,8 +54,11 @@ func EmbedIdentityInContext(identity account.Identity) (context.Context, error) 
 	if err != nil {
 		return nil, err
 	}
-	ctx = ContextWithRequest(ctx)
-	return manager.ContextWithTokenManager(ctx, TokenManager), nil
+	ctx, err = testsupport.ContextWithRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tokensupport.ContextWithTokenManager(ctx, TokenManager), nil
 }
 
 // GenerateToken generates a JWT token and signs it using the default private key
@@ -176,35 +182,15 @@ func UpdateToken(tokenString string, claims map[string]interface{}) (string, err
 	return tokenStr, nil
 }
 
-func ContextWithRequest(ctx context.Context) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	u := &url.URL{
-		Scheme: "https",
-		Host:   "auth.openshift.io",
-	}
-	rw := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		panic("invalid test " + err.Error()) // bug
-	}
-	return goa.NewContext(goa.WithAction(ctx, "Test"), rw, req, url.Values{})
-}
-
 func ContextWithTokenAndRequestID(t *testing.T) (context.Context, string, string) {
 	ctx, ctxToken, err := EmbedTokenInContext(uuid.NewV4().String(), uuid.NewV4().String())
-	ctx = manager.ContextWithTokenManager(ctx, TokenManager)
+	ctx = tokensupport.ContextWithTokenManager(ctx, TokenManager)
 	require.NoError(t, err)
 
 	reqID := uuid.NewV4().String()
 	ctx = client.SetContextRequestID(ctx, reqID)
 
 	return ctx, ctxToken, reqID
-}
-
-func ContextWithTokenManager() context.Context {
-	return manager.ContextWithTokenManager(context.Background(), TokenManager)
 }
 
 func configurationData() *configuration.ConfigurationData {

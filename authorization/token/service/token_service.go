@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
+	"time"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/fabric8-services/fabric8-auth/app"
 	"github.com/fabric8-services/fabric8-auth/application/service"
@@ -17,12 +20,11 @@ import (
 	"github.com/fabric8-services/fabric8-auth/errors"
 	"github.com/fabric8-services/fabric8-auth/log"
 	"github.com/fabric8-services/fabric8-auth/rest"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
+
 	"github.com/goadesign/goa"
 	"github.com/satori/go.uuid"
 	"golang.org/x/oauth2"
-
-	"sort"
-	"time"
 )
 
 // TokenServiceConfiguration the required configuration for the token service implementation
@@ -70,10 +72,12 @@ func (s *tokenServiceImpl) Audit(ctx context.Context, identity *accountrepo.Iden
 	}
 
 	// Get the token manager from the context
-	tokenManager, err := manager.ReadTokenManagerFromContext(ctx)
+	tm, err := tokensupport.ReadManagerFromContext(ctx)
 	if err != nil {
 		return nil, errors.NewInternalError(ctx, err)
 	}
+	// cast to `auth` token manager
+	tokenManager := tm.(manager.TokenManager)
 
 	// Now parse the token string that was passed in
 	tokenClaims, err := tokenManager.ParseToken(ctx, tokenString)
@@ -200,7 +204,7 @@ func (s *tokenServiceImpl) Audit(ctx context.Context, identity *accountrepo.Iden
 	err = s.ExecuteInTransaction(func() error {
 
 		// Initialize an array of permission objects that will be included in the token
-		perms := []manager.Permissions{}
+		perms := []tokensupport.Permissions{}
 
 		// Initialize an array of TokenPrivilege objects so that we can persist a record of the token's privileges to the database
 		tokenPrivs := []tokenrepo.TokenPrivilege{}
@@ -211,7 +215,7 @@ func (s *tokenServiceImpl) Audit(ctx context.Context, identity *accountrepo.Iden
 			return errors.NewInternalError(ctx, err)
 		}
 
-		perm := &manager.Permissions{
+		perm := &tokensupport.Permissions{
 			ResourceSetID: &resourceID,
 			Scopes:        privilegeCache.ScopesAsArray(),
 			Expiry:        privilegeCache.ExpiryTime.Unix(),
@@ -261,13 +265,13 @@ func (s *tokenServiceImpl) Audit(ctx context.Context, identity *accountrepo.Iden
 						return err
 					}
 					// Create a new permissions object for the RPT token and store it in the array
-					perms = append(perms, manager.Permissions{
+					perms = append(perms, tokensupport.Permissions{
 						ResourceSetID: &oldPrivResourceID,
 						Scopes:        privilegeCache.ScopesAsArray(),
 						Expiry:        privilegeCache.ExpiryTime.Unix(),
 					})
 				} else {
-					perms = append(perms, manager.Permissions{
+					perms = append(perms, tokensupport.Permissions{
 						ResourceSetID: &oldPrivResourceID,
 						Scopes:        oldPriv.ScopesAsArray(),
 						Expiry:        oldPriv.ExpiryTime.Unix(),
@@ -401,10 +405,12 @@ func (s *tokenServiceImpl) ExchangeRefreshToken(ctx context.Context, accessToken
 func (s *tokenServiceImpl) Refresh(ctx context.Context, identity *accountrepo.Identity, accessToken string) (string, error) {
 	log.Debug(ctx, map[string]interface{}{"identity_id": identity.ID.String()}, "refreshing a user token...")
 	// Get the token manager from the context
-	tokenManager, err := manager.ReadTokenManagerFromContext(ctx)
+	tm, err := tokensupport.ReadManagerFromContext(ctx)
 	if err != nil {
 		return "", errors.NewInternalError(ctx, err)
 	}
+	// cast to `auth` token manager
+	tokenManager := tm.(manager.TokenManager)
 	// Now parse the token string that was passed in
 	accessTokenClaims, err := tokenManager.ParseToken(ctx, accessToken)
 	if err != nil {
@@ -444,7 +450,7 @@ func (s *tokenServiceImpl) Refresh(ctx context.Context, identity *accountrepo.Id
 	signedToken := ""
 	err = s.ExecuteInTransaction(func() error {
 		// Initialize an array of permission objects that will be included in the token
-		perms := []manager.Permissions{}
+		perms := []tokensupport.Permissions{}
 		// Initialize an array of TokenPrivilege objects so that we can persist a record of the token's privileges to the database
 		tokenPrivs := []tokenrepo.TokenPrivilege{}
 		// If an existing RPT token is being replaced with a new token, then populate it with the privileges from the
@@ -472,7 +478,7 @@ func (s *tokenServiceImpl) Refresh(ctx context.Context, identity *accountrepo.Id
 						return errors.NewInternalError(ctx, err)
 					}
 					log.Debug(ctx, map[string]interface{}{"resource_id": oldPrivResourceID, "new_scopes": privilegeCache.ScopesAsArray(), "old_scopes": oldPriv.ScopesAsArray()}, "old privileges are stale")
-					perm := &manager.Permissions{
+					perm := &tokensupport.Permissions{
 						ResourceSetID: &oldPrivResourceID,
 						Scopes:        privilegeCache.ScopesAsArray(),
 						Expiry:        privilegeCache.ExpiryTime.Unix(),
@@ -480,7 +486,7 @@ func (s *tokenServiceImpl) Refresh(ctx context.Context, identity *accountrepo.Id
 					perms = append(perms, *perm)
 				} else {
 					// Create a new permissions object for the RPT token and store it in the array
-					perm := &manager.Permissions{
+					perm := &tokensupport.Permissions{
 						ResourceSetID: &oldPrivResourceID,
 						Scopes:        oldPriv.ScopesAsArray(),
 						Expiry:        oldPriv.ExpiryTime.Unix(),

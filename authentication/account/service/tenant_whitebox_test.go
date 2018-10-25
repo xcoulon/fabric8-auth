@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"errors"
-	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	authtest "github.com/fabric8-services/fabric8-auth/test"
 	testsuite "github.com/fabric8-services/fabric8-auth/test/suite"
 	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
@@ -90,7 +90,7 @@ func (s *TestTenantServiceSuite) TestInit() {
 
 func (s *TestTenantServiceSuite) TestDelete() {
 	ctx, _, reqID := testtoken.ContextWithTokenAndRequestID(s.T())
-	ctx = manager.ContextWithTokenManager(ctx, testtoken.TokenManager)
+	ctx = tokensupport.ContextWithTokenManager(ctx, testtoken.TokenManager)
 
 	token := testtoken.TokenManager.AuthServiceAccountToken()
 	s.doer.Client.Error = nil

@@ -2,8 +2,13 @@ package signer
 
 import (
 	"context"
+
+	"github.com/fabric8-services/fabric8-common/errors"
+
 	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
 	"github.com/fabric8-services/fabric8-auth/log"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
+
 	goaclient "github.com/goadesign/goa/client"
 )
 
@@ -37,12 +42,17 @@ func getServiceAccountSigner(ctx context.Context) (*goaclient.JWTSigner, error) 
 }
 
 func getServiceAccountToken(ctx context.Context) (string, error) {
-	tm, err := manager.ReadTokenManagerFromContext(ctx)
+	tm, err := tokensupport.ReadManagerFromContext(ctx)
+	if err != nil {
+		return "", errors.NewInternalError(ctx, err)
+	}
+	// cast to `auth` token manager
+	tokenManager := tm.(manager.TokenManager)
 	if err != nil {
 		log.Error(ctx, map[string]interface{}{
 			"error": err,
 		}, "unable to obtain service token")
 		return "", err
 	}
-	return tm.AuthServiceAccountToken(), nil
+	return tokenManager.AuthServiceAccountToken(), nil
 }

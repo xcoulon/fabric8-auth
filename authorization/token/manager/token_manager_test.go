@@ -2,17 +2,21 @@ package manager_test
 
 import (
 	"context"
-	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
 	"testing"
 	"time"
 
+	"github.com/fabric8-services/fabric8-common/test"
+
+	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
+
 	"github.com/fabric8-services/fabric8-auth/authentication/account"
 	"github.com/fabric8-services/fabric8-auth/authentication/account/repository"
 	testsuite "github.com/fabric8-services/fabric8-auth/test/suite"
 	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/fabric8-services/fabric8-auth/errors"
@@ -46,7 +50,8 @@ func (s *TestTokenSuite) TestRefreshedUserTokenForIdentity() {
 
 func (s *TestTokenSuite) TestGenerateUserTokenAndRefreshFlowForAPIClient() {
 	// given
-	ctx := testtoken.ContextWithRequest(nil)
+	ctx, err := test.ContextWithRequest(context.Background())
+	require.NoError(s.T(), err)
 	identityID := uuid.NewV4()
 	username := uuid.NewV4().String()
 	email := uuid.NewV4().String()
@@ -149,9 +154,9 @@ func (s *TestTokenSuite) checkGenerateRPTTokenForIdentity() {
 	claims, err := testtoken.TokenManager.ParseToken(ctx, userToken.AccessToken)
 	require.NoError(s.T(), err)
 
-	perms := []manager.Permissions{}
+	perms := []tokensupport.Permissions{}
 	resourceID := uuid.NewV4().String()
-	perms = append(perms, manager.Permissions{
+	perms = append(perms, tokensupport.Permissions{
 		ResourceSetID: &resourceID,
 		Scopes:        []string{"foo", "bar"},
 	})
@@ -403,7 +408,8 @@ func (s *TestTokenSuite) checkConvertToken(offlineToken bool) {
 }
 
 func (s *TestTokenSuite) generateToken(offlineToken bool) (*oauth2.Token, repository.Identity, context.Context) {
-	ctx := testtoken.ContextWithRequest(nil)
+	ctx, err := test.ContextWithRequest(context.Background())
+	require.NoError(s.T(), err)
 	user := repository.User{
 		ID:       uuid.NewV4(),
 		Email:    uuid.NewV4().String(),
@@ -480,7 +486,7 @@ func (s *TestTokenSuite) checkInvalidToken(token string) {
 }
 
 func (s *TestTokenSuite) TestCheckClaimsOK() {
-	claims := &manager.TokenClaims{
+	claims := &tokensupport.TokenClaims{
 		Email:    "somemail@domain.com",
 		Username: "testuser",
 	}
@@ -490,19 +496,19 @@ func (s *TestTokenSuite) TestCheckClaimsOK() {
 }
 
 func (s *TestTokenSuite) TestCheckClaimsFails() {
-	claimsNoEmail := &manager.TokenClaims{
+	claimsNoEmail := &tokensupport.TokenClaims{
 		Username: "testuser",
 	}
 	claimsNoEmail.Subject = uuid.NewV4().String()
 	assert.NotNil(s.T(), manager.CheckClaims(claimsNoEmail))
 
-	claimsNoUsername := &manager.TokenClaims{
+	claimsNoUsername := &tokensupport.TokenClaims{
 		Email: "somemail@domain.com",
 	}
 	claimsNoUsername.Subject = uuid.NewV4().String()
 	assert.NotNil(s.T(), manager.CheckClaims(claimsNoUsername))
 
-	claimsNoSubject := &manager.TokenClaims{
+	claimsNoSubject := &tokensupport.TokenClaims{
 		Email:    "somemail@domain.com",
 		Username: "testuser",
 	}
@@ -510,7 +516,7 @@ func (s *TestTokenSuite) TestCheckClaimsFails() {
 }
 
 func (s *TestTokenSuite) TestAuthServiceAccountSigner() {
-	ctx := manager.ContextWithTokenManager(context.Background(), testtoken.TokenManager)
+	ctx := tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager)
 	signer, err := manager.AuthServiceAccountSigner(ctx)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), signer)

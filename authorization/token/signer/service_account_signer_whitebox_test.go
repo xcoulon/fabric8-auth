@@ -1,14 +1,17 @@
 package signer_test
 
 import (
+	"context"
+	"net/http"
+	"testing"
+
 	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
 	"github.com/fabric8-services/fabric8-auth/authorization/token/signer"
 	testsuite "github.com/fabric8-services/fabric8-auth/test/suite"
-	tokentestsupport "github.com/fabric8-services/fabric8-auth/test/token"
+	testtoken "github.com/fabric8-services/fabric8-common/test/token"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"net/http"
-	"testing"
 )
 
 func TestSigner(t *testing.T) {
@@ -23,7 +26,7 @@ func (s *TestSignerSuite) TestServiceAccountSigner() {
 	t := s.T()
 
 	// create a context
-	ctx := tokentestsupport.ContextWithTokenManager()
+	ctx := tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager)
 	manager, err := manager.ReadTokenManagerFromContext(ctx)
 	require.Nil(t, err)
 

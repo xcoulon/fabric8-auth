@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"golang.org/x/oauth2"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"golang.org/x/oauth2"
 
 	"github.com/fabric8-services/fabric8-auth/application/service"
 	"github.com/fabric8-services/fabric8-auth/application/service/factory"
@@ -18,6 +19,7 @@ import (
 	"github.com/fabric8-services/fabric8-auth/test"
 	testsupport "github.com/fabric8-services/fabric8-auth/test"
 	testtoken "github.com/fabric8-services/fabric8-auth/test/token"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +59,9 @@ func (s *osoSubscriptionServiceTestSuite) TestNoTokenManagerInContextFails() {
 
 // Fails if the token is invalid
 func (s *osoSubscriptionServiceTestSuite) TestInvalidTokeFails() {
-	_, err := s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(testtoken.ContextWithTokenManager(), oauth2.Token{})
+	_, err := s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(
+		tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager),
+		oauth2.Token{})
 	require.Error(s.T(), err)
 }
 
@@ -67,7 +71,9 @@ func (s *osoSubscriptionServiceTestSuite) TestClientResponse() {
 
 	// Should return an error if the client failed
 	s.client.Error = errors.New("something went wrong")
-	_, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(testtoken.ContextWithTokenManager(), oauth2.Token{AccessToken: accessToken})
+	_, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(
+		tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager),
+		oauth2.Token{AccessToken: accessToken})
 	require.Error(s.T(), err)
 	assert.IsType(s.T(), autherrors.InternalError{}, err)
 
@@ -75,41 +81,53 @@ func (s *osoSubscriptionServiceTestSuite) TestClientResponse() {
 	s.client.Error = nil
 	body := ioutil.NopCloser(bytes.NewReader([]byte{}))
 	s.client.Response = &http.Response{Body: body, StatusCode: http.StatusInternalServerError}
-	_, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(testtoken.ContextWithTokenManager(), oauth2.Token{AccessToken: accessToken})
+	_, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(
+		tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager),
+		oauth2.Token{AccessToken: accessToken})
 	require.Error(s.T(), err)
 	assert.IsType(s.T(), autherrors.InternalError{}, err)
 
 	// Should return "signup_needed" if the client returns 404
 	s.client.Response = &http.Response{Body: body, StatusCode: http.StatusNotFound}
-	status, err := s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(testtoken.ContextWithTokenManager(), oauth2.Token{AccessToken: accessToken})
+	status, err := s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(
+		tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager),
+		oauth2.Token{AccessToken: accessToken})
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), "signup_needed", status)
 
 	// Should return an error if the client returns invalid payload
 	body = ioutil.NopCloser(bytes.NewReader([]byte("foo")))
 	s.client.Response = &http.Response{Body: body, StatusCode: http.StatusOK}
-	_, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(testtoken.ContextWithTokenManager(), oauth2.Token{AccessToken: accessToken})
+	_, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(
+		tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager),
+		oauth2.Token{AccessToken: accessToken})
 	require.Error(s.T(), err)
 	assert.IsType(s.T(), autherrors.InternalError{}, err)
 
 	// Should return "signup_needed" if no subscription found
 	body = ioutil.NopCloser(bytes.NewReader([]byte("{\"subscriptions\":[{\"status\":\"some-test-status\",\"plan\":{\"service\":{\"api_url\":\"unknown_cluster\"}}}]}")))
 	s.client.Response = &http.Response{Body: body, StatusCode: http.StatusOK}
-	status, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(testtoken.ContextWithTokenManager(), oauth2.Token{AccessToken: accessToken})
+	status, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(
+		tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager),
+		oauth2.Token{AccessToken: accessToken})
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), "signup_needed", status)
 
 	// Subscription found
 	body = ioutil.NopCloser(bytes.NewReader([]byte("{\"subscriptions\":[{\"status\":\"some-test-status-for2\",\"plan\":{\"service\":{\"api_url\":\"https://api.starter-us-east-2a.openshift.com/\"}}}]}")))
 	s.client.Response = &http.Response{Body: body, StatusCode: http.StatusOK}
-	status, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(testtoken.ContextWithTokenManager(), oauth2.Token{AccessToken: accessToken})
+	status, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(
+		tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager),
+		oauth2.Token{AccessToken: accessToken})
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), "some-test-status-for2", status)
 
 	// Multiple subscriptions
 	body = ioutil.NopCloser(bytes.NewReader([]byte("{\"subscriptions\":[{\"status\":\"some-test-status\",\"plan\":{\"service\":{\"api_url\":\"unknown_cluster\"}}},{\"status\":\"some-test-status-for2\",\"plan\":{\"service\":{\"api_url\":\"https://api.starter-us-east-2a.openshift.com/\"}}},{\"status\":\"some-test-status\",\"plan\":{\"service\":{\"api_url\":\"unknown_cluster\"}}}]}")))
 	s.client.Response = &http.Response{Body: body, StatusCode: http.StatusOK}
-	status, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(testtoken.ContextWithTokenManager(), oauth2.Token{AccessToken: accessToken})
+	status, err = s.Application.OSOSubscriptionService().LoadOSOSubscriptionStatus(
+		tokensupport.ContextWithTokenManager(context.Background(), testtoken.TokenManager),
+		oauth2.Token{AccessToken: accessToken})
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), "some-test-status-for2", status)
 }

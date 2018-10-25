@@ -3,8 +3,9 @@ package sentry
 import (
 	"context"
 	"fmt"
-	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
+
 	"github.com/fabric8-services/fabric8-auth/log"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
 
 	"github.com/getsentry/raven-go"
 	goajwt "github.com/goadesign/goa/middleware/security/jwt"
@@ -104,7 +105,7 @@ func (c *client) CaptureError(ctx context.Context, err error) {
 // extractUserInfo reads the context and returns sentry understandable
 // user object's reference and error
 func extractUserInfo(ctx context.Context) (*raven.User, error) {
-	m, err := manager.ReadTokenManagerFromContext(ctx)
+	m, err := tokensupport.ReadManagerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}

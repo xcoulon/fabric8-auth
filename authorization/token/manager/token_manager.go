@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/fabric8-services/fabric8-auth/authentication/account"
 	"github.com/fabric8-services/fabric8-auth/authentication/account/repository"
@@ -17,6 +18,14 @@ import (
 	"github.com/fabric8-services/fabric8-auth/goasupport"
 	"github.com/fabric8-services/fabric8-auth/log"
 	"github.com/fabric8-services/fabric8-auth/rest"
+	tokensupport "github.com/fabric8-services/fabric8-common/token"
+
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/goadesign/goa"
 	"github.com/goadesign/goa/client"
@@ -25,12 +34,6 @@ import (
 	"github.com/satori/go.uuid"
 	"golang.org/x/oauth2"
 	"gopkg.in/square/go-jose.v2"
-	"io"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 var defaultManager TokenManager
@@ -65,29 +68,6 @@ type TokenManagerConfiguration interface {
 	GetAuthServiceURL() string
 }
 
-// TokenClaims represents access token claims
-type TokenClaims struct {
-	Name          string         `json:"name"`
-	Username      string         `json:"preferred_username"`
-	GivenName     string         `json:"given_name"`
-	FamilyName    string         `json:"family_name"`
-	Email         string         `json:"email"`
-	EmailVerified bool           `json:"email_verified"`
-	Company       string         `json:"company"`
-	SessionState  string         `json:"session_state"`
-	Approved      bool           `json:"approved"`
-	Permissions   *[]Permissions `json:"permissions"`
-	jwt.StandardClaims
-}
-
-// Permissions represents a "permissions" claim in the AuthorizationPayload
-type Permissions struct {
-	ResourceSetName *string  `json:"resource_set_name"`
-	ResourceSetID   *string  `json:"resource_set_id"`
-	Scopes          []string `json:"scopes"`
-	Expiry          int64    `json:"exp"`
-}
-
 // #####################################################################################################################
 //
 // Token sets
@@ -110,11 +90,11 @@ func ReadTokenSet(ctx context.Context, res *http.Response) (*TokenSet, error) {
 	buf := new(bytes.Buffer)
 	io.Copy(buf, res.Body)
 	jsonString := strings.TrimSpace(buf.String())
-	return ReadTokenSetFromJson(ctx, jsonString)
+	return ReadTokenSetFromJSON(ctx, jsonString)
 }
 
-// ReadTokenSetFromJson parses json with a token set
-func ReadTokenSetFromJson(ctx context.Context, jsonString string) (*TokenSet, error) {
+// ReadTokenSetFromJSON parses json with a token set
+func ReadTokenSetFromJSON(ctx context.Context, jsonString string) (*TokenSet, error) {
 	var token TokenSet
 	err := json.Unmarshal([]byte(jsonString), &token)
 	if err != nil {
@@ -132,7 +112,7 @@ func ReadTokenSetFromJson(ctx context.Context, jsonString string) (*TokenSet, er
 // ContextIdentity returns the identity's ID found in given context
 // Uses tokenManager.Locate to fetch the identity of currently logged in user
 func ContextIdentity(ctx context.Context) (*uuid.UUID, error) {
-	tm, err := ReadTokenManagerFromContext(ctx)
+	tm, err := tokensupport.ReadManagerFromContext(ctx)
 	if err != nil {
 		log.Error(ctx, map[string]interface{}{}, "error reading token manager")
 
@@ -160,31 +140,11 @@ func ContextIdentity(ctx context.Context) (*uuid.UUID, error) {
 	return &uuid, nil
 }
 
-// ContextWithTokenManager injects tokenManager in the context for every incoming request
-// Accepts Token.Manager in order to make sure that correct object is set in the context.
-// Only other possible value is nil
-func ContextWithTokenManager(ctx context.Context, tm interface{}) context.Context {
-	return context.WithValue(ctx, contextTokenManagerKey, tm)
-}
-
-// ReadManagerFromContext extracts the token manager from the context and returns it
-func ReadTokenManagerFromContext(ctx context.Context) (TokenManager, error) {
-	tm := ctx.Value(contextTokenManagerKey)
-	if tm == nil {
-		log.Error(ctx, map[string]interface{}{
-			"token": tm,
-		}, "missing token manager")
-
-		return nil, errors.New("missing token manager")
-	}
-	return tm.(*tokenManager), nil
-}
-
 // InjectTokenManager is a middleware responsible for setting up tokenManager in the context for every request.
 func InjectTokenManager(tokenManager TokenManager) goa.Middleware {
 	return func(h goa.Handler) goa.Handler {
 		return func(ctx context.Context, rw http.ResponseWriter, req *http.Request) error {
-			ctxWithTM := ContextWithTokenManager(ctx, tokenManager)
+			ctxWithTM := tokensupport.ContextWithTokenManager(ctx, tokenManager)
 			return h(ctxWithTM, rw, req)
 		}
 	}
@@ -201,7 +161,7 @@ type TokenManager interface {
 	Parse(ctx context.Context, tokenString string) (*jwt.Token, error)
 	PublicKeys() []*rsa.PublicKey
 	Locate(ctx context.Context) (uuid.UUID, error)
-	ParseToken(ctx context.Context, tokenString string) (*TokenClaims, error)
+	ParseToken(ctx context.Context, tokenString string) (*tokensupport.TokenClaims, error)
 	ParseTokenWithMapClaims(ctx context.Context, tokenString string) (jwt.MapClaims, error)
 	PublicKey(keyID string) *rsa.PublicKey
 	JSONWebKeys() token.JSONKeys
@@ -213,7 +173,7 @@ type TokenManager interface {
 	GenerateUserTokenForAPIClient(ctx context.Context, keycloakToken oauth2.Token) (*oauth2.Token, error)
 	GenerateUserTokenForIdentity(ctx context.Context, identity repository.Identity, offlineToken bool) (*oauth2.Token, error)
 	GenerateUserTokenUsingRefreshToken(ctx context.Context, refreshTokenString string, identity *repository.Identity) (*oauth2.Token, error)
-	GenerateUnsignedRPTTokenForIdentity(ctx context.Context, tokenClaims *TokenClaims, identity repository.Identity, permissions *[]Permissions) (*jwt.Token, error)
+	GenerateUnsignedRPTTokenForIdentity(ctx context.Context, tokenClaims *tokensupport.TokenClaims, identity repository.Identity, permissions *[]tokensupport.Permissions) (*jwt.Token, error)
 	SignRPTToken(ctx context.Context, rptToken *jwt.Token) (string, error)
 	ConvertTokenSet(tokenSet TokenSet) *oauth2.Token
 	ConvertToken(oauthToken oauth2.Token) (*TokenSet, error)
@@ -387,7 +347,7 @@ func (m *tokenManager) GenerateUserTokenForIdentity(ctx context.Context, identit
 // #####################################################################################################################
 
 // GenerateUnsignedRPTTokenForIdentity generates a JWT RPT token for the given identity and specified permissions.
-func (m *tokenManager) GenerateUnsignedRPTTokenForIdentity(ctx context.Context, tokenClaims *TokenClaims, identity repository.Identity, permissions *[]Permissions) (*jwt.Token, error) {
+func (m *tokenManager) GenerateUnsignedRPTTokenForIdentity(ctx context.Context, tokenClaims *tokensupport.TokenClaims, identity repository.Identity, permissions *[]tokensupport.Permissions) (*jwt.Token, error) {
 	unsignedRPTtoken, err := m.GenerateUnsignedRPTTokenFromClaims(ctx, tokenClaims, &identity, permissions)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -396,7 +356,7 @@ func (m *tokenManager) GenerateUnsignedRPTTokenForIdentity(ctx context.Context, 
 }
 
 // GenerateUnsignedRPTTokenFromClaims generates a new RPT token based on an existing set of claims, and a specified set of permissions
-func (m *tokenManager) GenerateUnsignedRPTTokenFromClaims(ctx context.Context, tokenClaims *TokenClaims, identity *repository.Identity, permissions *[]Permissions) (*jwt.Token, error) {
+func (m *tokenManager) GenerateUnsignedRPTTokenFromClaims(ctx context.Context, tokenClaims *tokensupport.TokenClaims, identity *repository.Identity, permissions *[]tokensupport.Permissions) (*jwt.Token, error) {
 	token, err := m.GenerateUnsignedUserAccessTokenFromClaims(ctx, tokenClaims, identity)
 	if err != nil {
 		return nil, err
@@ -409,8 +369,8 @@ func (m *tokenManager) GenerateUnsignedRPTTokenFromClaims(ctx context.Context, t
 }
 
 // SignRPTToken generates a signature for the specified rpt token and returns it
-func (mgm *tokenManager) SignRPTToken(ctx context.Context, rptToken *jwt.Token) (string, error) {
-	return rptToken.SignedString(mgm.userAccountPrivateKey.Key)
+func (m *tokenManager) SignRPTToken(ctx context.Context, rptToken *jwt.Token) (string, error) {
+	return rptToken.SignedString(m.userAccountPrivateKey.Key)
 }
 
 // #####################################################################################################################
@@ -420,7 +380,7 @@ func (mgm *tokenManager) SignRPTToken(ctx context.Context, rptToken *jwt.Token) 
 // #####################################################################################################################
 
 // GenerateUnsignedUserAccessTokenFromClaims generates a new token based on the specified claims
-func (m *tokenManager) GenerateUnsignedUserAccessTokenFromClaims(ctx context.Context, tokenClaims *TokenClaims, identity *repository.Identity) (*jwt.Token, error) {
+func (m *tokenManager) GenerateUnsignedUserAccessTokenFromClaims(ctx context.Context, tokenClaims *tokensupport.TokenClaims, identity *repository.Identity) (*jwt.Token, error) {
 	token := jwt.New(jwt.SigningMethodRS256)
 	token.Header["kid"] = m.userAccountPrivateKey.KeyID
 
@@ -657,7 +617,7 @@ func (m *tokenManager) GenerateUnsignedUserAccessTokenFromRefreshToken(ctx conte
 		return nil, errors.WithStack(err)
 	}
 
-	refreshTokenClaims, err := m.ParseToken(ctx, refreshTokenString)
+	refreshtokenClaims, err := m.ParseToken(ctx, refreshTokenString)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -688,20 +648,20 @@ func (m *tokenManager) GenerateUnsignedUserAccessTokenFromRefreshToken(ctx conte
 		claims["email"] = identity.User.Email
 		claims["company"] = identity.User.Company
 	} else {
-		claims["sub"] = refreshTokenClaims.Subject
+		claims["sub"] = refreshtokenClaims.Subject
 
 		// refresh token should have all following claims included only for api_client(e.g. vscode analytics) who don't have identity in auth db
-		claims["email_verified"] = refreshTokenClaims.EmailVerified
-		claims["name"] = refreshTokenClaims.Name
-		claims["preferred_username"] = refreshTokenClaims.Username
-		claims["given_name"] = refreshTokenClaims.GivenName
-		claims["family_name"] = refreshTokenClaims.FamilyName
-		claims["email"] = refreshTokenClaims.Email
-		claims["company"] = refreshTokenClaims.Company
+		claims["email_verified"] = refreshtokenClaims.EmailVerified
+		claims["name"] = refreshtokenClaims.Name
+		claims["preferred_username"] = refreshtokenClaims.Username
+		claims["given_name"] = refreshtokenClaims.GivenName
+		claims["family_name"] = refreshtokenClaims.FamilyName
+		claims["email"] = refreshtokenClaims.Email
+		claims["company"] = refreshtokenClaims.Company
 	}
 
-	claims["azp"] = refreshTokenClaims.Audience
-	claims["session_state"] = refreshTokenClaims.SessionState
+	claims["azp"] = refreshtokenClaims.Audience
+	claims["session_state"] = refreshtokenClaims.SessionState
 	claims["acr"] = "0"
 
 	realmAccess := make(map[string]interface{})
@@ -826,7 +786,7 @@ func (m *tokenManager) GenerateUnsignedUserAccessTokenForAPIClient(ctx context.C
 }
 
 // GenerateUnsignedUserAccessTokenFromClaimsForAPIClient generates a new token based on the specified claims for api_client
-func (m *tokenManager) GenerateUnsignedUserAccessTokenFromClaimsForAPIClient(ctx context.Context, tokenClaims *TokenClaims) (*jwt.Token, error) {
+func (m *tokenManager) GenerateUnsignedUserAccessTokenFromClaimsForAPIClient(ctx context.Context, tokenClaims *tokensupport.TokenClaims) (*jwt.Token, error) {
 	token := jwt.New(jwt.SigningMethodRS256)
 	token.Header["kid"] = m.userAccountPrivateKey.KeyID
 
@@ -947,8 +907,8 @@ func (m *tokenManager) GenerateUnsignedUserRefreshTokenForAPIClient(ctx context.
 // #####################################################################################################################
 
 // JSONWebKeys returns all the public keys in JSON Web Keys format
-func (mgm *tokenManager) JSONWebKeys() token.JSONKeys {
-	return mgm.jsonWebKeys
+func (m *tokenManager) JSONWebKeys() token.JSONKeys {
+	return m.jsonWebKeys
 }
 
 // KeyFunction returns a function that can be used to extract the key ID (kid) claim value from a JWT token
@@ -964,7 +924,7 @@ func (m *tokenManager) KeyFunction(ctx context.Context) jwt.Keyfunc {
 			log.Error(ctx, map[string]interface{}{
 				"kid": kid,
 			}, "There is no public key with such ID")
-			return nil, errors.New(fmt.Sprintf("There is no public key with such ID: %s", kid))
+			return nil, errors.Errorf("There is no public key with such ID: %s", kid)
 		}
 		return key, nil
 	}
@@ -1003,12 +963,12 @@ func (m *tokenManager) Parse(ctx context.Context, tokenString string) (*jwt.Toke
 }
 
 // ParseToken parses the specified token string and returns its claims
-func (m *tokenManager) ParseToken(ctx context.Context, tokenString string) (*TokenClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &TokenClaims{}, m.KeyFunction(ctx))
+func (m *tokenManager) ParseToken(ctx context.Context, tokenString string) (*tokensupport.TokenClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &tokensupport.TokenClaims{}, m.KeyFunction(ctx))
 	if err != nil {
 		return nil, err
 	}
-	claims := token.Claims.(*TokenClaims)
+	claims := token.Claims.(*tokensupport.TokenClaims)
 	if token.Valid {
 		return claims, nil
 	}
@@ -1256,7 +1216,7 @@ func NumberToInt(number interface{}) (int64, error) {
 }
 
 // CheckClaims checks if all the required claims are present in the access token
-func CheckClaims(claims *TokenClaims) error {
+func CheckClaims(claims *tokensupport.TokenClaims) error {
 	if claims.Subject == "" {
 		return errors.New("subject claim not found in token")
 	}
@@ -1275,9 +1235,12 @@ func CheckClaims(claims *TokenClaims) error {
 
 // AuthServiceAccountSigner returns a new JWT signer which uses the Auth Service Account token
 func AuthServiceAccountSigner(ctx context.Context) (client.Signer, error) {
-	tm, err := ReadTokenManagerFromContext(ctx)
+	tm, err := tokensupport.ReadManagerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return tm.AuthServiceAccountSigner(), nil
+	if tm, ok := tm.(TokenManager); ok {
+		return tm.AuthServiceAccountSigner(), nil
+	}
+	return nil, errors.Errorf("token manager in context is not valid")
 }
