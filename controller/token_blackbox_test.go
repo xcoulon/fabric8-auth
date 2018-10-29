@@ -17,6 +17,7 @@ import (
 	"github.com/fabric8-services/fabric8-auth/application"
 	"github.com/fabric8-services/fabric8-auth/application/service"
 	account "github.com/fabric8-services/fabric8-auth/authentication/account/repository"
+	provider "github.com/fabric8-services/fabric8-auth/authentication/provider/repository"
 	"github.com/fabric8-services/fabric8-auth/authorization/token"
 	tokenPkg "github.com/fabric8-services/fabric8-auth/authorization/token"
 	"github.com/fabric8-services/fabric8-auth/authorization/token/manager"
@@ -242,9 +243,15 @@ func (s *TokenControllerTestSuite) TestLinkOK() {
 
 func (s *TokenControllerTestSuite) TestLinkCallbackRedirects() {
 	// given
+	state := provider.OauthStateReference{
+		State: "foo",
+	}
+	s.Application.OauthStates().Create(context.Background(), &state)
+	token := uuid.NewV4().String()
+	testsupport.ActivateDummyLinkingProviderFactory(s, s.Configuration, token, false)
 	svc, ctrl, _ := s.SecuredController()
 	// when
-	response := test.LinkCallbackTokenTemporaryRedirect(s.T(), svc.Context, svc, ctrl, "", "")
+	response := test.LinkCallbackTokenTemporaryRedirect(s.T(), svc.Context, svc, ctrl, "", "foo")
 	// then
 	require.NotNil(s.T(), response)
 	location := response.Header()["Location"]

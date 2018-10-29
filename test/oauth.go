@@ -30,6 +30,10 @@ type dummyIdentityProviderFactoryImpl struct {
 	provider provider.IdentityProvider
 }
 
+// verify that dummyIdentityProviderFactoryImpl implements all required interfaces
+var _ dummyIdentityProviderFactory = &dummyIdentityProviderFactoryImpl{}
+var _ svc.IdentityProviderFactory = &dummyIdentityProviderFactoryImpl{}
+
 func ActivateDummyIdentityProviderFactory(w wrapper.Wrapper, provider provider.IdentityProvider) {
 	w.WrapFactory(svc.FACTORY_TYPE_IDENTITY_PROVIDER,
 		func(ctx servicecontext.ServiceContext, config *configuration.ConfigurationData) wrapper.FactoryWrapper {
@@ -69,6 +73,10 @@ type dummyLinkingProviderFactoryImpl struct {
 	token           string
 	loadProfileFail bool
 }
+
+// verify that dummyLinkingProviderFactoryImpl implements all required interfaces
+var _ dummyLinkingProviderFactory = &dummyLinkingProviderFactoryImpl{}
+var _ svc.LinkingProviderFactory = &dummyLinkingProviderFactoryImpl{}
 
 // ActivateDummyLinkingProviderFactory can be used to create a mock linking provider factory
 func ActivateDummyLinkingProviderFactory(w wrapper.Wrapper, config *configuration.ConfigurationData, token string, loadProfileFail bool) {
