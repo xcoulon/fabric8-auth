@@ -16,7 +16,7 @@ POSTGRESQL_VERSION:=9.6
 deploy-auth: deploy-auth-secrets deploy-auth-db deploy-auth-only
 
 .PHONY: deploy-auth-only
-deploy-auth-only: build build-image
+deploy-auth-only: build-linux build-image
 	@echo "Deploys auth service ${TAG}"
 	@oc process -f $(TEMPLATE_DIR)/auth.app.yaml \
 		-p DOCKER_REPO=$(DOCKER_REPO) \
@@ -60,12 +60,8 @@ deploy-wit-db:
 		-o yaml | oc apply -f -
 
 .PHONY: build-image
-build-image: expose-minishift-docker-env
-	docker build -t $(DOCKER_REPO)/$(IMAGE_NAME):dev -f Dockerfile.dev .
-
-.PHONY: expose-minishift-docker-env
-expose-minishift-docker-env:
-	-eval `minishift docker-env`
+build-image: 
+	eval $(minishift docker-env) && docker build -t $(DOCKER_REPO)/$(IMAGE_NAME):dev -f Dockerfile.dev .
 
 .PHONY: deploy-auth-secrets
 deploy-auth-secrets:

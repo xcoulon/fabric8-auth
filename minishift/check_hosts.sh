@@ -7,8 +7,8 @@ if grep -q "$IP $HOSTNAME" $ETC_HOSTS; then
 else
     echo "Updating /etc/hosts (Remove old minishift.local if any and add new one)"
     # remove old entries with $HOSTNAME if any
-    sudo sed -i "/$HOSTNAME_REGEX/d" $ETC_HOSTS
+    sudo sed -i "" "/$HOSTNAME_REGEX/d" $ETC_HOSTS
     # add new entry
-    echo $IP $HOSTNAME | sudo tee --append $ETC_HOSTS;
+    echo $IP $HOSTNAME | sudo tee -a $ETC_HOSTS;
 fi
 

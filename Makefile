@@ -167,6 +167,12 @@ generate-client: $(GOAGEN_BIN)
 ## Build server and client.
 build: prebuild-check deps generate $(BINARY_SERVER_BIN) $(BINARY_CLIENT_BIN) # do the build
 
+.PHONY: build-linux
+# Build the server binary for Linux
+build-linux: prebuild-check deps generate
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -v ${LDFLAGS} -o ${BINARY_SERVER_BIN}
+
+
 $(BINARY_SERVER_BIN): $(SOURCES)
 ifeq ($(OS),Windows_NT)
 	go build -v ${LDFLAGS} -o "$(shell cygpath --windows '$(BINARY_SERVER_BIN)')"
