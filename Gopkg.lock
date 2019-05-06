@@ -4,9 +4,9 @@
 [[projects]]
   name = "cirello.io/pglock"
   packages = ["."]
-  revision = "96beb072c82169ab35ca0317cb5caebd8faa0429"
+  revision = "3c6e8e654aa6046016854efb1f3dcec6a2fafb58"
   source = "github.com/cirello-io/pglock"
-  version = "v1.2.0"
+  version = "v1.2.1"
 
 [[projects]]
   name = "github.com/ajg/form"
@@ -75,7 +75,7 @@
     "resource",
     "test/suite"
   ]
-  revision = "083c9c890cdf825027a0f009135af153d07d2926"
+  revision = "41fa54b85d3328d6f145ef98c0cb2181975df64d"
 
 [[projects]]
   name = "github.com/fabric8-services/fabric8-notification"
@@ -528,6 +528,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "eb8bb3b9ba10aef0a0d5dd76a56cdb1a8aa4faf9f3f93469ddd8b04261420b7c"
+  inputs-digest = "ebfdcadd95cbee80e4e95bc96c2c78088920e5bc74890c4e5071edf0016c9de3"
   solver-name = "gps-cdcl"
   solver-version = 1

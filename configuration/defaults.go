@@ -94,11 +94,12 @@ vwIDAQAB
 	defaultOAuthProviderEndpointUserInfo = "https://sso.prod-preview.openshift.io/auth/realms/fabric8-test/protocol/openid-connect/userinfo"
 	defaultOAuthProviderEndpointLogout   = "https://sso.prod-preview.openshift.io/auth/realms/fabric8-test/protocol/openid-connect/logout"
 
-	defaultPublicOAuthClientID = "740650a2-9c44-4db5-b067-a3d1b2cd2d01"
-	defaultWITDomainPrefix     = "api"
-	devModeWITURL              = "http://localhost:8080"
-	devModeTenantServiceURL    = "http://localhost:8090"
-	devModeCheServiceURL       = "http://localhost:8091"
+	defaultPublicOAuthClientID   = "740650a2-9c44-4db5-b067-a3d1b2cd2d01"
+	defaultWITDomainPrefix       = "api"
+	devModeWITURL                = "http://localhost:8080"
+	devModeTenantServiceURL      = "http://localhost:8090"
+	devModeCheServiceURL         = "http://localhost:8091"
+	defaultOSORegistrationAppURL = "http://localhost:8085"
 
 	// DefaultValidRedirectURLs is a regex to be used to whitelist redirect URL for auth
 	// If the AUTH_REDIRECT_VALID env var is not set then in Dev Mode all redirects allowed - *
@@ -115,21 +116,26 @@ vwIDAQAB
 	// The number of hours to retain expired tokens.  After this time limit has been exceeded, the token may be cleaned up (deleted)
 	defaultExpiredTokenRetentionHours = 24
 
-	defaultUserDeactivationEnabled             = false
-	defaultUserDeactivationNotificationEnabled = false
+	defaultUserDeactivationEnabled             = true
+	defaultUserDeactivationNotificationEnabled = true
 	// defaultUserDeactivationFetchLimit the default number of accounts to return when fetching the users to deactivate (and deactivate at once)
 	defaultUserDeactivationFetchLimit = 10
-	// defaultUserDeactivationInactivityPeriod the default number of days of inactivity before a user account can be deactivated
-	defaultUserDeactivationInactivityNotificationPeriod = 24 // 24 days
-	// defaultUserDeactivationInactivityPeriod the default number of days of inactivity before a user account can be deactivated
-	//	defaultUserDeactivationInactivityPeriod = defaultUserDeactivationInactivityNotificationPeriod + 7 // 31 days (7 days after defaultUserDeactivationInactivityNotificationPeriod)
-	defaultUserDeactivationInactivityPeriod = defaultUserDeactivationInactivityNotificationPeriod + 1 // 31 days (1 day after defaultUserDeactivationInactivityNotificationPeriod)
-	// defaultPostDeactivationNotificationDelay the default number of milliseconds between to user account deactivation notifications by the same go routine
-	defaultPostDeactivationNotificationDelay = 500
-	// defaultCheServiceURL the default URL to the Che service
-	defaultCheServiceURL = "http://rhche-host:8080"
-	// defaultPostDeactivationNotificationDelay the default interval between 2 cycles of the user deactivation worker
+	// defaultUserDeactivationInactivityNotificationPeriodDays the default number of days of inactivity before a user account can be deactivated
+	defaultUserDeactivationInactivityNotificationPeriodDays = 24 // 24 days
+	// defaultUserDeactivationInactivityPeriodDays the default number of days of inactivity before a user account can be deactivated
+	defaultUserDeactivationInactivityPeriodDays = defaultUserDeactivationInactivityNotificationPeriodDays + 7 // 31 days (7 days after defaultUserDeactivationInactivityNotificationPeriod)
+	// defaultPostDeactivationNotificationDelayMillis the default number of milliseconds between to user account deactivation notifications by the same go routine
+	defaultPostDeactivationNotificationDelayMillis = 500
+	// defaultUserDeactivationWorkerIntervalSeconds the default interval between 2 cycles of the user deactivation worker
 	defaultUserDeactivationWorkerIntervalSeconds = 60 * 60 // 1 hour
 	// defaultUserDeactivationNotificationWorkerIntervalSeconds the default interval between 2 cycles of the user deactivation notification worker
 	defaultUserDeactivationNotificationWorkerIntervalSeconds = 60 * 60 // 1 hour
+
+	// defaultPodName the default name of the pod (in order to avoid empty value in the logs)
+	defaultPodName = "unknown"
+	// defaultUserDeactivationRescheduleDelayDays default of 1 day to re-attempt a failed deactivation attempt
+	defaultUserDeactivationRescheduleDelayHours = 24 // 24 hours
+
+	// defaultCheServiceURL the default URL to the Che service
+	defaultCheServiceURL = "http://rhche-host:8080"
 )

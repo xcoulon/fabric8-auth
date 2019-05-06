@@ -39,13 +39,13 @@ func (s *UserDeactivationNotificationWorkerTest) TestNotifyUsers() {
 	config.GetUserDeactivationFetchLimitFunc = func() int {
 		return 100
 	}
-	config.GetUserDeactivationInactivityPeriodDaysFunc = func() time.Duration {
+	config.GetUserDeactivationInactivityPeriodFunc = func() time.Duration {
 		return 30 * 24 * time.Hour // 31 days, ie, 7 days after notification
 	}
-	config.GetUserDeactivationInactivityNotificationPeriodDaysFunc = func() time.Duration {
+	config.GetUserDeactivationInactivityNotificationPeriodFunc = func() time.Duration {
 		return 20 * 24 * time.Hour // 24 days
 	}
-	config.GetPostDeactivationNotificationDelayMillisFunc = func() time.Duration {
+	config.GetPostDeactivationNotificationDelayFunc = func() time.Duration {
 		return 5 * time.Millisecond
 	}
 	ctx := context.Background()
@@ -125,12 +125,14 @@ func (s *UserDeactivationNotificationWorkerTest) TestNotifyUsers() {
 		// verify that the lock was released
 		l, err := s.Application.WorkerLockRepository().AcquireLock(context.Background(), "assert", worker.UserDeactivationNotification)
 		require.NoError(s.T(), err)
-		l.Close()
+		err = l.Close()
+		require.NoError(s.T(), err)
 	})
 }
 
 func (s *UserDeactivationNotificationWorkerTest) newUserDeactivationNotificationWorker(ctx context.Context, podname string, app application.Application) worker.UserDeactivationNotificationWorker {
-	os.Setenv("AUTH_POD_NAME", podname)
+	err := os.Setenv("AUTH_POD_NAME", podname)
+	require.NoError(s.T(), err)
 	config, err := configuration.GetConfigurationData()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), podname, config.GetPodName())
